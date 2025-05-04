@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Plant Health Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+    }
+    .fc-tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4">
+<div class="flex h-screen">
+
+  <!-- Left Sidebar -->
+  <div class="w-60 bg-white rounded-lg shadow-md flex flex-col items-center py-4">
+    <div class="text-2xl">🌱</div>
+    <div class="mt-6 text-center text-sm text-gray-700 px-2">
+      🌿 {{ tip or 'Water your plant in the morning to reduce evaporation.' }}
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col px-8 space-y-6">
+
+    <div class="mt-4">
+      <h1 class="text-3xl font-semibold">Welcome, Abbas</h1>
+      <p class="text-gray-500">Grow like a pro!</p>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex gap-4 w-full justify-evenly">
+      <a href="/scan" class="px-6 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition">Full Scan</a>
+      <a href="/capture" class="px-6 py-2 text-green-600 border border-green-600 rounded-lg hover:bg-green-600 hover:text-white transition">Take Picture</a>
+      <form action="/upload" method="post" enctype="multipart/form-data">
+        <label class="px-6 py-2 text-purple-600 border border-purple-600 rounded-lg hover:bg-purple-600 hover:text-white cursor-pointer transition">
+          Upload & Scan
+          <input type="file" name="image" accept="image/*" class="hidden" onchange="this.form.submit()" required>
+        </label>
+      </form>
+    </div>
+
+    <!-- Capture Preview Section with Side-by-Side Images -->
+<div class="bg-white rounded-xl shadow p-6 text-center">
+  <h2 class="text-xl font-semibold mb-4">Latest Scan Preview</h2>
+  <div class="grid grid-cols-2 gap-4">
+    <!-- Original -->
+    <div>
+      <p class="text-gray-600 mb-2">Original Image</p>
+      <img src="{{ url_for('static', filename='plant.jpg') }}?v={{ now.timestamp() }}"
+           alt="Plant Capture"
+           class="rounded-lg shadow h-64 object-contain border border-gray-300 mx-auto">
+    </div>
+
+    <!-- Annotated -->
+    <div>
+      <p class="text-gray-600 mb-2">Annotated Prediction</p>
+      <img src="{{ url_for('static', filename='annotated_latest.jpg') }}?v={{ now.timestamp() }}"
+           alt="Annotated Image"
+           class="rounded-lg shadow h-64 object-contain border border-gray-300 mx-auto">
+    </div>
+  </div>
+</div>
+
+    <!-- Tips -->
+    <div class="flex gap-4">
+      <div class="flex-1 bg-white rounded-xl shadow p-4">
+        <h3 class="font-semibold text-lg mb-2">Health Tip</h3>
+        <p class="text-gray-600">{{ latest['Remedy'] if latest is not none else 'Improve ventilation and apply an approved fungicide.' }}</p>
+      </div>
+      <div class="flex-1 bg-white rounded-xl shadow p-4">
+        <h3 class="font-semibold text-lg mb-2">Growth Tip</h3>
+        <p class="text-gray-600">
+          Your plant is {{ latest['Height_cm'] }} cm tall.<br>
+          Always check your nutrient levels.
+        </p>
+      </div>
+    </div>
+
+    <!-- Calendar -->
+    <div class="bg-white rounded-xl shadow p-4">
+      <h3 class="text-xl font-semibold mb-4">Full Log Calendar</h3>
+      <div id="calendar" class="max-w-full"></div>
+    </div>
+  </div>
+
+  <!-- Right Sidebar -->
+  <div class="w-64 bg-white rounded-lg shadow-md flex flex-col justify-between p-4">
+    <div>
+      <div class="bg-gray-100 rounded-md p-4 mb-4">
+        <h3 class="text-lg font-semibold">Recent Summary</h3>
+        <p class="text-sm text-gray-500">See full calendar below →</p>
+      </div>
+      <a href="/download" class="block w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 rounded-lg mb-4 text-center">Download Log</a>
+      <div class="space-y-2">
+        {% for log in recent_logs %}
+          <div class="flex items-center gap-2">
+            <span class="h-3 w-3 bg-{{ log.color }} rounded-full"></span>
+            <span class="text-gray-600">{{ log.label }} • {{ log.time }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var calendarEl = document.getElementById('calendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+      height: 500,
+      contentHeight: 'auto',
+      expandRows: true,
+      initialView: 'dayGridMonth',
+      events: {{ calendar_events | safe }},
+      eventColor: '#4B5563',
+      eventDidMount: function(info) {
+        if (info.event.extendedProps.tooltip) {
+          let tip = document.createElement("div");
+          tip.className = "fc-tooltip";
+          tip.innerHTML = info.event.extendedProps.tooltip;
+          info.el.onmouseover = (e) => {
+            document.body.appendChild(tip);
+            tip.style.left = e.pageX + 'px';
+            tip.style.top = e.pageY + 'px';
+          };
+          info.el.onmouseout = () => {
+            tip.remove();
+          };
+        }
+      }
+    });
+    calendar.render();
+  });
+</script>
+</body>
+</html>
